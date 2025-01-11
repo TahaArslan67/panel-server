@@ -8,12 +8,19 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
+// CORS ayarları
 app.use(cors({
-  origin: '*',
+  origin: [
+    'https://panel-client-h5hahjc85-taha-arslans-projects.vercel.app',
+    'http://localhost:3000'
+  ],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Options isteklerini ele al
+app.options('*', cors());
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
