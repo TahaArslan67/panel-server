@@ -6,15 +6,20 @@
       "use": "@vercel/node"
     }
   ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "*" },
+        { "key": "Access-Control-Allow-Headers", "value": "*" }
+      ]
+    }
+  ],
   "routes": [
     {
       "src": "/(.*)",
       "dest": "src/index.ts"
     }
-  ],
-  "env": {
-    "MONGODB_URI": "mongodb+srv://arslantaha67:0022800228t@panel.gjn1k.mongodb.net/",
-    "JWT_SECRET": "your-secret-key",
-    "NODE_ENV": "production"
-  }
+  ]
 } 
