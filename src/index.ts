@@ -70,15 +70,10 @@ app.use(async (req, res, next) => {
 });
 
 // Routes
-app.use('/login', authRoutes);
-
-// Ana endpoint
-app.get('/', (req, res) => {
-  res.json({ message: 'API is running' });
-});
+app.use('/', authRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Server is running',
