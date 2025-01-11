@@ -11,7 +11,7 @@ const app = express();
 // CORS ayarları
 app.use(cors({
   origin: [
-    'https://panel-client-h5hahjc85-taha-arslans-projects.vercel.app',
+    'https://panel-client-j4tohksle-taha-arslans-projects.vercel.app',
     'http://localhost:3000'
   ],
   credentials: true,
