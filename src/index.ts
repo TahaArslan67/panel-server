@@ -70,7 +70,7 @@ app.use(async (req, res, next) => {
 });
 
 // Routes
-app.use('/', authRoutes);
+app.use('/api/auth', authRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
