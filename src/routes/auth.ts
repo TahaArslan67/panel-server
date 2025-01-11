@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import { auth, AuthRequest } from '../middleware/auth';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -39,12 +40,23 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // MongoDB bağlantı durumunu kontrol et
+    if (mongoose.connection.readyState !== 1) {
+      console.error('MongoDB connection is not ready:', mongoose.connection.readyState);
+      res.status(503).json({ message: 'Veritabanı bağlantısı kurulamadı' });
+      return;
+    }
+
     console.log('Searching for user:', username);
     const user = await User.findOne({ username })
       .select('+password')
       .lean()
       .maxTimeMS(5000)
-      .exec();
+      .exec()
+      .catch((err) => {
+        console.error('MongoDB query error:', err);
+        return null;
+      });
 
     if (!user) {
       console.log('User not found:', username);
@@ -61,10 +73,16 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not defined');
+      res.status(500).json({ message: 'Sunucu yapılandırma hatası' });
+      return;
+    }
+
     console.log('Password match, generating token');
     const token = jwt.sign(
       { id: user._id, username: user.username },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
@@ -81,7 +99,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       error: error.message,
       stack: error.stack,
       name: error.name,
-      code: error.code
+      code: error.code,
+      mongoState: mongoose.connection.readyState
     });
     
     if (error.name === 'MongoTimeoutError') {
@@ -95,6 +114,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     if (error.name === 'MongoError' || error.name === 'MongoServerError') {
       res.status(503).json({ 
         message: 'Veritabanı hatası',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+      return;
+    }
+
+    if (error.name === 'JsonWebTokenError') {
+      res.status(500).json({ 
+        message: 'Token oluşturma hatası',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
       return;
