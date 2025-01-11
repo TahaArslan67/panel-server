@@ -41,9 +41,24 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // MongoDB bağlantısı
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://arslantaha67:0022800228t@panel.gjn1k.mongodb.net/';
 
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.set('bufferCommands', false);
+mongoose.set('strictQuery', true);
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000, // 5 saniye
+      socketTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
+    console.log('MongoDB connected');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  }
+};
+
+connectDB();
 
 // Ana endpoint
 app.get('/', (req, res) => {

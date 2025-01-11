@@ -30,16 +30,10 @@ router.use((req, res, next) => {
 // Login endpoint
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
-    // CORS headers for login endpoint
-    res.header('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-
     const { username, password } = req.body;
-    console.log('Login attempt:', { username });  // Güvenlik için şifreyi loglamıyoruz
+    console.log('Login attempt:', { username });
 
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username }).select('+password').lean().exec();
     console.log('User found:', user ? 'Yes' : 'No');
 
     if (!user) {
