@@ -31,23 +31,37 @@ router.use((req, res, next) => {
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, password } = req.body;
-    console.log('Login attempt:', { username });
+    
+    if (!username || !password) {
+      res.status(400).json({ message: 'Kullanıcı adı ve şifre gereklidir' });
+      return;
+    }
 
-    const user = await User.findOne({ username }).select('+password').lean().exec();
-    console.log('User found:', user ? 'Yes' : 'No');
+    console.log('Login attempt for username:', username);
+
+    const user = await User.findOne({ username })
+      .select('+password')
+      .lean()
+      .maxTimeMS(3000) // 3 saniye timeout
+      .exec();
 
     if (!user) {
+      console.log('User not found:', username);
       res.status(401).json({ message: 'Kullanıcı adı veya şifre hatalı' });
       return;
     }
+
+    console.log('User found, comparing password');
 
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log('Password match:', isMatch);
 
     if (!isMatch) {
+      console.log('Password mismatch for user:', username);
       res.status(401).json({ message: 'Kullanıcı adı veya şifre hatalı' });
       return;
     }
+
+    console.log('Password match, generating token');
 
     const token = jwt.sign(
       { id: user._id, username: user.username },
@@ -55,11 +69,20 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       { expiresIn: '1h' }
     );
 
-    console.log('Login successful, token generated');
+    console.log('Login successful for user:', username);
     res.json({ token });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+  } catch (error: any) {
+    console.error('Login error:', error.message);
+    
+    if (error.name === 'MongoTimeoutError') {
+      res.status(503).json({ message: 'Veritabanı yanıt vermiyor, lütfen daha sonra tekrar deneyin' });
+      return;
+    }
+
+    res.status(500).json({ 
+      message: 'Sunucu hatası',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

@@ -17,24 +17,6 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Pre-flight istekleri için
-app.options('*', cors({
-  origin: 'https://panel-client-sigma.vercel.app',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
-
-// Her istekte CORS başlıklarını ekle
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-});
-
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -44,21 +26,48 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://arslantaha67:00228
 mongoose.set('bufferCommands', false);
 mongoose.set('strictQuery', true);
 
+let isConnected = false;
+
 const connectDB = async () => {
+  if (isConnected) {
+    console.log('MongoDB is already connected');
+    return;
+  }
+
   try {
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // 5 saniye
+    const options = {
+      serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 5000,
       connectTimeoutMS: 5000,
-    });
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 10000,
+      compressors: "zlib"
+    };
+
+    await mongoose.connect(MONGODB_URI, options);
+    isConnected = true;
     console.log('MongoDB connected');
   } catch (err) {
     console.error('MongoDB connection error:', err);
-    process.exit(1);
+    isConnected = false;
+    // Hata durumunda uygulamayı sonlandırmak yerine devam et
+    // process.exit(1);
   }
 };
 
-connectDB();
+// Her istek öncesi MongoDB bağlantısını kontrol et
+app.use(async (req, res, next) => {
+  try {
+    if (!isConnected) {
+      await connectDB();
+    }
+    next();
+  } catch (error) {
+    console.error('Database connection error:', error);
+    res.status(500).json({ message: 'Database connection error' });
+  }
+});
 
 // Ana endpoint
 app.get('/', (req, res) => {
@@ -70,13 +79,21 @@ app.use('/api/auth', authRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    dbStatus: isConnected ? 'connected' : 'disconnected'
+  });
 });
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
-  res.status(500).json({ error: 'Something went wrong!', details: err.message });
+  res.status(500).json({ 
+    error: 'Something went wrong!', 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 // 404 handler
@@ -91,5 +108,8 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`Server running on port ${PORT}`);
   });
 }
+
+// İlk bağlantıyı başlat
+connectDB();
 
 export default app;
