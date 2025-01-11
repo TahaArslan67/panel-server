@@ -9,25 +9,17 @@ dotenv.config();
 const app = express();
 
 // CORS ayarları
-const corsOptions = {
-  origin: 'https://panel-client-sigma.vercel.app',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-
-// Pre-flight istekleri için
-app.options('*', cors(corsOptions));
-
-// Her istek için CORS başlıklarını ekle
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // OPTIONS istekleri için hemen yanıt ver
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   next();
 });
 
