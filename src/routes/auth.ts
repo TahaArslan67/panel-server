@@ -6,6 +6,19 @@ import { auth, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
+// CORS headers middleware
+router.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Debug middleware
 router.use((req, res, next) => {
   console.log('Auth Route - Path:', req.path);
@@ -17,11 +30,17 @@ router.use((req, res, next) => {
 // Login endpoint
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
+    // CORS headers for login endpoint
+    res.header('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+
     const { username, password } = req.body;
-    console.log('Login attempt:', { username, password });
+    console.log('Login attempt:', { username });  // Güvenlik için şifreyi loglamıyoruz
 
     const user = await User.findOne({ username });
-    console.log('Found user:', user);
+    console.log('User found:', user ? 'Yes' : 'No');
 
     if (!user) {
       res.status(401).json({ message: 'Kullanıcı adı veya şifre hatalı' });
@@ -29,7 +48,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log('Password comparison result:', isMatch);
+    console.log('Password match:', isMatch);
 
     if (!isMatch) {
       res.status(401).json({ message: 'Kullanıcı adı veya şifre hatalı' });
