@@ -12,7 +12,7 @@
       "dest": "src/index.ts",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       "headers": {
-        "Access-Control-Allow-Origin": "https://panel-client-j4tohksle-taha-arslans-projects.vercel.app",
+        "Access-Control-Allow-Origin": "https://panel-client-sigma.vercel.app",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
         "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization",
         "Access-Control-Allow-Credentials": "true"
