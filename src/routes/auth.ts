@@ -30,19 +30,20 @@ router.use((req, res, next) => {
 // Login endpoint
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('Login request received:', { body: req.body });
     const { username, password } = req.body;
     
     if (!username || !password) {
+      console.log('Missing credentials:', { username: !!username, password: !!password });
       res.status(400).json({ message: 'Kullanıcı adı ve şifre gereklidir' });
       return;
     }
 
-    console.log('Login attempt for username:', username);
-
+    console.log('Searching for user:', username);
     const user = await User.findOne({ username })
       .select('+password')
       .lean()
-      .maxTimeMS(3000) // 3 saniye timeout
+      .maxTimeMS(5000)
       .exec();
 
     if (!user) {
@@ -52,7 +53,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     console.log('User found, comparing password');
-
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
@@ -62,7 +62,6 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     console.log('Password match, generating token');
-
     const token = jwt.sign(
       { id: user._id, username: user.username },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -70,12 +69,34 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     );
 
     console.log('Login successful for user:', username);
-    res.json({ token });
+    res.status(200).json({ 
+      token,
+      user: {
+        id: user._id,
+        username: user.username
+      }
+    });
   } catch (error: any) {
-    console.error('Login error:', error.message);
+    console.error('Login error details:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    });
     
     if (error.name === 'MongoTimeoutError') {
-      res.status(503).json({ message: 'Veritabanı yanıt vermiyor, lütfen daha sonra tekrar deneyin' });
+      res.status(503).json({ 
+        message: 'Veritabanı yanıt vermiyor, lütfen daha sonra tekrar deneyin',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+      return;
+    }
+
+    if (error.name === 'MongoError' || error.name === 'MongoServerError') {
+      res.status(503).json({ 
+        message: 'Veritabanı hatası',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
       return;
     }
 
