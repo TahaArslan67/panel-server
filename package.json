@@ -9,7 +9,7 @@
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "vercel-build": "echo hello"
+    "vercel-build": "npm install && tsc"
   },
   "dependencies": {
     "@types/bcrypt": "^5.0.2",
