@@ -13,13 +13,21 @@ const corsOptions = {
   origin: 'https://panel-client-sigma.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
+  credentials: true,
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 };
 
 app.use(cors(corsOptions));
 
-// Pre-flight istekleri için
-app.options('*', cors(corsOptions));
+// Pre-flight istekleri için özel işleme
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'https://panel-client-sigma.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
