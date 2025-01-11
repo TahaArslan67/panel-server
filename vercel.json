@@ -20,7 +20,7 @@
     }
   ],
   "env": {
-    "MONGODB_URI": "mongodb+srv://admin:admin123@cluster0.aqbvxvj.mongodb.net/panel?retryWrites=true&w=majority",
+    "MONGODB_URI": "mongodb+srv://arslantaha67:0022800228t@panel.gjn1k.mongodb.net/",
     "JWT_SECRET": "your-secret-key",
     "NODE_ENV": "production"
   }

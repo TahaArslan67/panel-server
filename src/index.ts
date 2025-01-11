@@ -26,7 +26,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // MongoDB bağlantısı
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:admin123@cluster0.aqbvxvj.mongodb.net/panel?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://arslantaha67:0022800228t@panel.gjn1k.mongodb.net/';
 
 mongoose.connect(MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
