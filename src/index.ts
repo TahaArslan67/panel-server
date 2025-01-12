@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -9,41 +9,31 @@ dotenv.config();
 
 const app = express();
 
-// CORS ayarları
+// Middleware
 app.use(cors());
 app.use(express.json());
 
 // MongoDB bağlantı ayarları
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI || '';
 
-if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI is not defined');
-}
-
-// MongoDB bağlantı yönetimi
+// MongoDB bağlantı fonksiyonu
 const connectDB = async () => {
   try {
-    if (mongoose.connection.readyState === 1) {
-      return mongoose.connection;
-    }
-
-    const conn = await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(MONGODB_URI);
     console.log('MongoDB bağlantısı başarılı');
-    return conn;
   } catch (error) {
     console.error('MongoDB bağlantı hatası:', error);
-    throw error;
+    process.exit(1);
   }
 };
 
-// Root endpoint
-app.get('/', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', message: 'Panel API is running' });
+// Routes
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', message: 'Panel API is running' });
 });
 
-// Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({
+app.get('/health', (_req, res) => {
+  res.json({
     status: 'ok',
     message: 'Server is running',
     environment: process.env.NODE_ENV,
@@ -51,12 +41,11 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Error handler
-app.use((err: any, req: Request, res: Response) => {
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
     message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
@@ -72,24 +61,8 @@ if (process.env.NODE_ENV !== 'production') {
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
-  }).catch(console.error);
+  });
 }
 
-// Vercel için handler
-const handler = async (req: Request, res: Response) => {
-  try {
-    // MongoDB bağlantısı
-    await connectDB();
-    
-    // Express uygulamasını çalıştır
-    return app(req, res);
-  } catch (error) {
-    console.error('Handler error:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: process.env.NODE_ENV === 'production' ? undefined : (error as Error).message
-    });
-  }
-};
-
-export default handler;
+// Production için export
+export default app;
