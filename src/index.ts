@@ -47,25 +47,34 @@ const connectDB = async () => {
   }
 
   try {
-    console.log('Connecting to MongoDB...');
+    console.log('Connecting to MongoDB...', { uri: MONGODB_URI.substring(0, 20) + '...' });
     const options: mongoose.ConnectOptions = {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 30000,
       connectTimeoutMS: 10000,
-      maxPoolSize: 50,
-      minPoolSize: 10,
-      maxIdleTimeMS: 60000,
-      compressors: "zlib",
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 30000,
       retryWrites: true
     };
 
     await mongoose.connect(MONGODB_URI, options);
     isConnected = true;
     console.log('MongoDB connected successfully');
-  } catch (err) {
-    console.error('MongoDB connection error:', err);
+  } catch (err: any) {
+    console.error('MongoDB connection error:', err.message);
     isConnected = false;
-    throw new Error('Failed to connect to MongoDB');
+    
+    // Vercel için özel hata mesajı
+    if (process.env.VERCEL) {
+      console.error('Vercel environment detected, additional debug info:', {
+        mongoUri: MONGODB_URI.substring(0, 20) + '...',
+        nodeEnv: process.env.NODE_ENV,
+        error: err.message
+      });
+    }
+    
+    throw new Error(`Failed to connect to MongoDB: ${err.message}`);
   }
 };
 
@@ -78,7 +87,18 @@ app.use(async (req, res, next) => {
     }
     next();
   } catch (error: any) {
-    console.error('Database connection error:', error);
+    console.error('Database connection error:', error.message);
+    
+    // Vercel için özel hata yanıtı
+    if (process.env.VERCEL) {
+      return res.status(503).json({ 
+        message: 'Database connection error',
+        error: error.message,
+        env: process.env.NODE_ENV,
+        vercel: true
+      });
+    }
+    
     res.status(503).json({ 
       message: 'Database connection error',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Service temporarily unavailable'
