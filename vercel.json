@@ -6,22 +6,14 @@
       "use": "@vercel/node"
     }
   ],
-  "rewrites": [
-    { 
-      "source": "/api/:path*",
-      "destination": "/src/index.ts"
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/src/index.ts"
     },
     {
-      "source": "/health",
-      "destination": "/src/index.ts"
-    },
-    {
-      "source": "/",
-      "destination": "/src/index.ts"
+      "src": "/(.*)",
+      "dest": "/src/index.ts"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "MONGODB_URI": "mongodb+srv://arslantaha67:0022800228t@panel.gjn1k.mongodb.net/panel?retryWrites=true&w=majority&appName=Panel"
-  }
+  ]
 } 

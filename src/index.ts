@@ -24,20 +24,7 @@ if (!MONGODB_URI) {
 // MongoDB bağlantı fonksiyonu
 const connectDB = async () => {
   try {
-    if (mongoose.connection.readyState === 1) {
-      console.log('MongoDB zaten bağlı');
-      return;
-    }
-
-    await mongoose.connect(MONGODB_URI, {
-      retryWrites: true,
-      w: 'majority',
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000
-    });
-
+    await mongoose.connect(MONGODB_URI);
     console.log('MongoDB bağlantısı başarılı');
   } catch (error) {
     console.error('MongoDB bağlantı hatası:', error);
@@ -50,34 +37,13 @@ app.get('/', (_req, res) => {
   res.json({ status: 'ok', message: 'Panel API is running' });
 });
 
-app.get('/health', async (_req, res) => {
-  try {
-    await connectDB();
-    const dbState = mongoose.connection.readyState;
-    const dbStatus: { [key: number]: string } = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting'
-    };
-
-    res.json({
-      status: 'ok',
-      message: 'Server is running',
-      environment: process.env.NODE_ENV,
-      database: {
-        status: dbStatus[dbState] || 'unknown',
-        uri: MONGODB_URI.replace(/:[^:]*@/, ':****@')
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Database connection failed',
-      timestamp: new Date().toISOString()
-    });
-  }
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Server is running',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.use('/api/auth', authRoutes);
@@ -103,26 +69,5 @@ if (process.env.NODE_ENV !== 'production') {
   }).catch(console.error);
 }
 
-// Vercel için handler
-const handler = async (req: express.Request, res: express.Response) => {
-  try {
-    // Root endpoint için özel kontrol
-    if (req.url === '/') {
-      return res.json({ status: 'ok', message: 'Panel API is running' });
-    }
-
-    // MongoDB bağlantısı
-    await connectDB();
-    
-    // Express uygulamasını çalıştır
-    return app(req, res);
-  } catch (error) {
-    console.error('Handler error:', error);
-    return res.status(500).json({
-      error: 'Server error',
-      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error as Error).message
-    });
-  }
-};
-
-export default handler;
+// Production için export
+module.exports = app;
