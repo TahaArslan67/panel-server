@@ -6,18 +6,10 @@
       "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/src/index.ts"
-    },
-    {
-      "source": "/health",
-      "destination": "/src/index.ts"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/src/index.ts"
+      "src": "/(.*)",
+      "dest": "src/index.ts"
     }
   ]
 } 

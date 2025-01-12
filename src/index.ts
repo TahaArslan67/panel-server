@@ -8,14 +8,15 @@ import notificationRoutes from './routes/notifications';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5001;
 
 // CORS ayarları
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? 'https://panel-client-sigma.vercel.app'
-    : 'http://localhost:3000',
-  credentials: true
+    ? ['https://panel-client-sigma.vercel.app']
+    : ['http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -25,35 +26,33 @@ app.use(express.json());
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  console.error('MONGODB_URI is not defined');
-  process.exit(1);
+  throw new Error('MONGODB_URI is not defined in environment variables');
 }
 
-mongoose.set('strictQuery', true);
-
+// MongoDB bağlantı fonksiyonu
 const connectDB = async () => {
   try {
-    console.log('Attempting to connect to MongoDB with URI:', MONGODB_URI.replace(/:[^:]*@/, ':****@'));
+    console.log('MongoDB bağlantısı başlatılıyor...');
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
       maxPoolSize: 10,
       minPoolSize: 5
     });
-    console.log('MongoDB connected successfully');
+    console.log('MongoDB bağlantısı başarılı!');
+    return true;
   } catch (error: any) {
-    console.error('MongoDB connection error details:', {
+    console.error('MongoDB bağlantı hatası:', {
       message: error.message,
       code: error.code,
-      name: error.name,
-      stack: error.stack
+      name: error.name
     });
-    throw error;
+    return false;
   }
 };
 
-// Health check endpoint with detailed info
-app.get('/health', (req, res) => {
+// Health check endpoint
+app.get('/health', async (req, res) => {
   const dbState = mongoose.connection.readyState;
   const dbStatus: Record<number, string> = {
     0: 'disconnected',
@@ -81,55 +80,36 @@ app.use('/api/notifications', notificationRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const errorResponse = {
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : err.message,
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
     status: err.status || 500,
-    code: err.code,
-    path: req.path,
-    method: req.method,
-    timestamp: new Date().toISOString()
-  };
-
-  console.error('Error details:', {
-    ...errorResponse,
-    stack: err.stack,
-    headers: req.headers,
-    query: req.query,
-    body: req.body
+    path: req.path
   });
-
-  res.status(errorResponse.status).json(errorResponse);
 });
 
-// Vercel için serverless export
+// Vercel için handler
 let isConnected = false;
 
 const handler = async (req: express.Request, res: express.Response) => {
   if (!isConnected) {
-    try {
-      await connectDB();
-      isConnected = true;
-    } catch (error) {
-      console.error('Failed to connect to MongoDB:', error);
-      res.status(500).json({ error: 'Database connection failed' });
-      return;
+    isConnected = await connectDB();
+    if (!isConnected) {
+      return res.status(500).json({ error: 'Database connection failed' });
     }
   }
-  
   return app(req, res);
 };
 
 // Development ortamında normal Express sunucusu olarak çalıştır
 if (process.env.NODE_ENV !== 'production') {
-  connectDB().then(() => {
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-    });
-  }).catch((error) => {
-    console.error('Server startup failed:', error);
-    process.exit(1);
+  const port = process.env.PORT || 5001;
+  connectDB().then((connected) => {
+    if (connected) {
+      app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+      });
+    }
   });
 }
 
