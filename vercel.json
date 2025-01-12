@@ -8,11 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "src/index.ts",
-      "headers": {
-        "cache-control": "s-maxage=1, stale-while-revalidate=59"
-      }
+      "src": "/api/(.*)",
+      "dest": "src/index.ts"
+    },
+    {
+      "src": "/health",
+      "dest": "src/index.ts"
+    },
+    {
+      "src": "/",
+      "dest": "src/index.ts"
     }
   ],
   "regions": ["fra1"],

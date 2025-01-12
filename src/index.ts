@@ -47,13 +47,14 @@ const connectDB = async () => {
   }
 };
 
-// Basit endpoint'ler
+// Root endpoint
 app.get('/', (_req, res) => {
-  res.json({ status: 'ok', message: 'Panel API is running' });
+  res.status(200).json({ status: 'ok', message: 'Panel API is running' });
 });
 
+// Health check endpoint
 app.get('/health', (_req, res) => {
-  res.json({
+  res.status(200).json({
     status: 'ok',
     message: 'Server is running',
     environment: process.env.NODE_ENV,
@@ -105,4 +106,8 @@ if (process.env.NODE_ENV !== 'production') {
   }).catch(console.error);
 }
 
+// Express app'i export et
+export { app };
+
+// Vercel handler'ı export et
 export default handler;
