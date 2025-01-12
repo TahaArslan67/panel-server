@@ -48,10 +48,7 @@ const connectDB = async () => {
       name: error.name,
       stack: error.stack
     });
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(`Database connection failed: ${error.message}`);
-    }
-    process.exit(1);
+    throw error;
   }
 };
 
@@ -106,12 +103,34 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(errorResponse.status).json(errorResponse);
 });
 
-// Connect to MongoDB and start server
-connectDB().then(() => {
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+// Vercel için serverless export
+let isConnected = false;
+
+const handler = async (req: express.Request, res: express.Response) => {
+  if (!isConnected) {
+    try {
+      await connectDB();
+      isConnected = true;
+    } catch (error) {
+      console.error('Failed to connect to MongoDB:', error);
+      res.status(500).json({ error: 'Database connection failed' });
+      return;
+    }
+  }
+  
+  return app(req, res);
+};
+
+// Development ortamında normal Express sunucusu olarak çalıştır
+if (process.env.NODE_ENV !== 'production') {
+  connectDB().then(() => {
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  }).catch((error) => {
+    console.error('Server startup failed:', error);
+    process.exit(1);
   });
-}).catch((error) => {
-  console.error('Server startup failed:', error);
-  process.exit(1);
-});
+}
+
+export default handler;
