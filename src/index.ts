@@ -3,19 +3,26 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
+import notificationRoutes from './routes/notifications';
 
 dotenv.config();
 
 const app = express();
 
 // CORS ayarları
-app.use(cors({
-  origin: 'https://panel-client-sigma.vercel.app',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://panel-client-sigma.vercel.app'
+    : 'http://localhost:3000',
   credentials: true,
-  optionsSuccessStatus: 200
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+
+// CORS Preflight için özel middleware
+app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -81,6 +88,7 @@ app.use(async (req, res, next) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
