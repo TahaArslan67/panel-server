@@ -26,48 +26,39 @@ app.use(express.json());
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI is not defined in environment variables');
+  throw new Error('MONGODB_URI is not defined');
 }
 
-mongoose.set('strictQuery', true);
-
-// MongoDB bağlantı yönetimi
-let cachedConnection: typeof mongoose | null = null;
+// Global connection promise
+let dbPromise: Promise<typeof mongoose> | null = null;
 
 const connectDB = async () => {
-  if (cachedConnection) {
-    console.log('Cached MongoDB bağlantısı kullanılıyor');
-    return cachedConnection;
+  if (!dbPromise) {
+    console.log('MongoDB bağlantısı başlatılıyor...');
+    
+    // Yeni bağlantı oluştur
+    dbPromise = mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 3000,
+      socketTimeoutMS: 3000,
+      connectTimeoutMS: 3000,
+      maxPoolSize: 1,
+      minPoolSize: 1,
+      maxIdleTimeMS: 3000
+    }).catch(err => {
+      console.error('MongoDB bağlantı hatası:', err);
+      dbPromise = null;
+      throw err;
+    });
   }
 
-  try {
-    console.log('Yeni MongoDB bağlantısı başlatılıyor...');
-    const conn = await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 5000,
-      maxPoolSize: 1
-    });
-    
-    console.log('MongoDB bağlantısı başarılı!');
-    cachedConnection = conn;
-    return conn;
-  } catch (error: any) {
-    console.error('MongoDB bağlantı hatası:', {
-      message: error.message,
-      code: error.code,
-      name: error.name
-    });
-    throw error;
-  }
+  return dbPromise;
 };
 
-// Root endpoint - Hızlı yanıt
+// Basit endpoint'ler - MongoDB bağlantısı gerektirmez
 app.get('/', (_req, res) => {
   res.json({ status: 'ok', message: 'Panel API is running' });
 });
 
-// Health check endpoint - Hızlı yanıt
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
@@ -93,32 +84,35 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Vercel için handler
 const handler = async (req: express.Request, res: express.Response) => {
+  // Basit endpoint'ler için hızlı yanıt
+  if (req.url === '/') {
+    return res.json({ status: 'ok', message: 'Panel API is running' });
+  }
+  if (req.url === '/health') {
+    return res.json({
+      status: 'ok',
+      message: 'Server is running',
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   try {
-    // Hızlı endpoint'ler için özel kontrol
-    if (req.url === '/') {
-      return res.json({ status: 'ok', message: 'Panel API is running' });
-    }
-    if (req.url === '/health') {
-      return res.json({
-        status: 'ok',
-        message: 'Server is running',
-        environment: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Diğer endpoint'ler için MongoDB bağlantısı gerekli
-    if (!cachedConnection) {
-      await connectDB();
-    }
-
+    // MongoDB bağlantısı gerektiren endpoint'ler için
+    await connectDB();
     return app(req, res);
   } catch (error) {
     console.error('Handler error:', error);
     return res.status(500).json({ 
-      error: 'Internal server error',
+      error: 'Database connection failed',
       message: process.env.NODE_ENV === 'production' ? undefined : (error as Error).message
     });
+  } finally {
+    // Bağlantıyı kapat
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close();
+      dbPromise = null;
+    }
   }
 };
 
