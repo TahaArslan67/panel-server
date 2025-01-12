@@ -29,13 +29,21 @@ if (!MONGODB_URI) {
   throw new Error('MONGODB_URI is not defined in environment variables');
 }
 
+mongoose.set('strictQuery', true);
+
 // MongoDB bağlantı fonksiyonu
 const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    console.log('MongoDB zaten bağlı');
+    return true;
+  }
+
   try {
     console.log('MongoDB bağlantısı başlatılıyor...');
     await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 5000, // Timeout süresini düşürdük
+      socketTimeoutMS: 30000,
+      connectTimeoutMS: 10000,
       maxPoolSize: 10,
       minPoolSize: 5
     });
@@ -50,6 +58,11 @@ const connectDB = async () => {
     return false;
   }
 };
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Panel API is running' });
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -92,13 +105,26 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 let isConnected = false;
 
 const handler = async (req: express.Request, res: express.Response) => {
-  if (!isConnected) {
-    isConnected = await connectDB();
+  try {
     if (!isConnected) {
-      return res.status(500).json({ error: 'Database connection failed' });
+      console.log('İlk bağlantı denemesi başlatılıyor...');
+      isConnected = await connectDB();
+      if (!isConnected) {
+        console.error('Veritabanı bağlantısı başarısız oldu');
+        return res.status(500).json({ error: 'Database connection failed' });
+      }
     }
+
+    // Root endpoint için özel kontrol
+    if (req.url === '/') {
+      return res.json({ status: 'ok', message: 'Panel API is running' });
+    }
+
+    return app(req, res);
+  } catch (error) {
+    console.error('Handler error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-  return app(req, res);
 };
 
 // Development ortamında normal Express sunucusu olarak çalıştır
