@@ -6,25 +6,7 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "src/index.ts"
-    },
-    {
-      "src": "/health",
-      "dest": "src/index.ts"
-    },
-    {
-      "src": "/",
-      "dest": "src/index.ts"
-    }
-  ],
-  "regions": ["fra1"],
-  "functions": {
-    "src/index.ts": {
-      "memory": 1024,
-      "maxDuration": 3
-    }
-  }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/src/index.ts" }
+  ]
 } 

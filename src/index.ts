@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -10,14 +10,7 @@ dotenv.config();
 const app = express();
 
 // CORS ayarları
-const corsOptions = {
-  origin: '*',  // Tüm originlere izin ver
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 // MongoDB bağlantı ayarları
@@ -29,17 +22,13 @@ if (!MONGODB_URI) {
 
 // MongoDB bağlantı yönetimi
 const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
   try {
-    const conn = await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 2000,
-      socketTimeoutMS: 2000,
-      connectTimeoutMS: 2000,
-      maxPoolSize: 1
-    });
+    if (mongoose.connection.readyState === 1) {
+      return mongoose.connection;
+    }
+
+    const conn = await mongoose.connect(MONGODB_URI);
+    console.log('MongoDB bağlantısı başarılı');
     return conn;
   } catch (error) {
     console.error('MongoDB bağlantı hatası:', error);
@@ -48,12 +37,12 @@ const connectDB = async () => {
 };
 
 // Root endpoint
-app.get('/', (_req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Panel API is running' });
 });
 
 // Health check endpoint
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     message: 'Server is running',
@@ -62,12 +51,12 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: Request, res: Response) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
     message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
@@ -75,26 +64,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     path: req.path
   });
 });
-
-// Vercel için handler
-const handler = async (req: express.Request, res: express.Response) => {
-  // Basit endpoint'ler için hızlı yanıt
-  if (req.url === '/' || req.url === '/health') {
-    return app(req, res);
-  }
-
-  try {
-    // MongoDB bağlantısı gerektiren endpoint'ler için
-    await connectDB();
-    return app(req, res);
-  } catch (error) {
-    console.error('Handler error:', error);
-    return res.status(500).json({ 
-      error: 'Database connection failed',
-      message: process.env.NODE_ENV === 'production' ? undefined : (error as Error).message
-    });
-  }
-};
 
 // Development ortamında normal Express sunucusu olarak çalıştır
 if (process.env.NODE_ENV !== 'production') {
@@ -106,8 +75,21 @@ if (process.env.NODE_ENV !== 'production') {
   }).catch(console.error);
 }
 
-// Express app'i export et
-export { app };
+// Vercel için handler
+const handler = async (req: Request, res: Response) => {
+  try {
+    // MongoDB bağlantısı
+    await connectDB();
+    
+    // Express uygulamasını çalıştır
+    return app(req, res);
+  } catch (error) {
+    console.error('Handler error:', error);
+    return res.status(500).json({
+      error: 'Server error',
+      message: process.env.NODE_ENV === 'production' ? undefined : (error as Error).message
+    });
+  }
+};
 
-// Vercel handler'ı export et
 export default handler;
