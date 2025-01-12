@@ -8,141 +8,73 @@ import notificationRoutes from './routes/notifications';
 dotenv.config();
 
 const app = express();
+const port = process.env.PORT || 5001;
 
 // CORS ayarları
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://panel-client-sigma.vercel.app'
     : 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  credentials: true
 };
 
 app.use(cors(corsOptions));
+app.use(express.json());
 
-// CORS Preflight için özel middleware
-app.options('*', cors(corsOptions));
-
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-// MongoDB bağlantısı
+// MongoDB bağlantı ayarları
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  console.error('MONGODB_URI is not defined in environment variables');
+  console.error('MONGODB_URI is not defined');
   process.exit(1);
 }
 
-mongoose.set('bufferCommands', false);
 mongoose.set('strictQuery', true);
 
-let isConnected = false;
-
 const connectDB = async () => {
-  if (isConnected) {
-    console.log('MongoDB is already connected');
-    return;
-  }
-
   try {
-    console.log('Connecting to MongoDB...', { uri: MONGODB_URI.substring(0, 20) + '...' });
-    const options: mongoose.ConnectOptions = {
+    await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 30000,
-      connectTimeoutMS: 10000,
+      socketTimeoutMS: 5000,
       maxPoolSize: 10,
-      minPoolSize: 5,
-      maxIdleTimeMS: 30000,
-      retryWrites: true
-    };
-
-    await mongoose.connect(MONGODB_URI, options);
-    isConnected = true;
+      minPoolSize: 5
+    });
     console.log('MongoDB connected successfully');
-  } catch (err: any) {
-    console.error('MongoDB connection error:', err.message);
-    isConnected = false;
-    
-    // Vercel için özel hata mesajı
-    if (process.env.VERCEL) {
-      console.error('Vercel environment detected, additional debug info:', {
-        mongoUri: MONGODB_URI.substring(0, 20) + '...',
-        nodeEnv: process.env.NODE_ENV,
-        error: err.message
-      });
+  } catch (error: any) {
+    console.error('MongoDB connection error:', error.message);
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`Database connection failed: ${error.message}`);
     }
-    
-    throw new Error(`Failed to connect to MongoDB: ${err.message}`);
+    process.exit(1);
   }
 };
 
-// Her istek öncesi MongoDB bağlantısını kontrol et
-app.use(async (req, res, next) => {
-  try {
-    if (!isConnected) {
-      console.log('Attempting to establish MongoDB connection...');
-      await connectDB();
-    }
-    next();
-  } catch (error: any) {
-    console.error('Database connection error:', error.message);
-    
-    // Vercel için özel hata yanıtı
-    if (process.env.VERCEL) {
-      return res.status(503).json({ 
-        message: 'Database connection error',
-        error: error.message,
-        env: process.env.NODE_ENV,
-        vercel: true
-      });
-    }
-    
-    res.status(503).json({ 
-      message: 'Database connection error',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Service temporarily unavailable'
-    });
-  }
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running' });
 });
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Server is running',
-    dbStatus: isConnected ? 'connected' : 'disconnected'
-  });
-});
-
-// Error handling middleware
+// Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
-  res.status(500).json({ 
-    error: 'Something went wrong!', 
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  res.status(err.status || 500).json({
+    message: process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : err.message,
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
   });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found', path: req.path });
-});
-
-const PORT = process.env.PORT || 5001;
-
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Connect to MongoDB and start server
+connectDB().then(() => {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
   });
-}
-
-// İlk bağlantıyı başlat
-connectDB();
-
-export default app;
+}).catch((error) => {
+  console.error('Server startup failed:', error);
+  process.exit(1);
+});
