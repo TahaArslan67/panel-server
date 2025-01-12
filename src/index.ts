@@ -33,15 +33,21 @@ mongoose.set('strictQuery', true);
 
 const connectDB = async () => {
   try {
+    console.log('Attempting to connect to MongoDB with URI:', MONGODB_URI.replace(/:[^:]*@/, ':****@'));
     await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
       maxPoolSize: 10,
       minPoolSize: 5
     });
     console.log('MongoDB connected successfully');
   } catch (error: any) {
-    console.error('MongoDB connection error:', error.message);
+    console.error('MongoDB connection error details:', {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+      stack: error.stack
+    });
     if (process.env.NODE_ENV === 'production') {
       throw new Error(`Database connection failed: ${error.message}`);
     }
@@ -49,9 +55,27 @@ const connectDB = async () => {
   }
 };
 
-// Health check endpoint
+// Health check endpoint with detailed info
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+  const dbState = mongoose.connection.readyState;
+  const dbStatus: Record<number, string> = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+  
+  res.json({
+    status: 'ok',
+    message: 'Server is running',
+    environment: process.env.NODE_ENV,
+    database: {
+      status: dbStatus[dbState] || 'unknown',
+      host: mongoose.connection.host,
+      name: mongoose.connection.name
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Routes
@@ -60,13 +84,26 @@ app.use('/api/notifications', notificationRoutes);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
+  const errorResponse = {
     message: process.env.NODE_ENV === 'production' 
       ? 'Internal server error' 
       : err.message,
-    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+    status: err.status || 500,
+    code: err.code,
+    path: req.path,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  };
+
+  console.error('Error details:', {
+    ...errorResponse,
+    stack: err.stack,
+    headers: req.headers,
+    query: req.query,
+    body: req.body
   });
+
+  res.status(errorResponse.status).json(errorResponse);
 });
 
 // Connect to MongoDB and start server
