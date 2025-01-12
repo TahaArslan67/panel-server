@@ -2,18 +2,17 @@
   "version": 2,
   "builds": [
     {
-      "src": "src/index.ts",
+      "src": "dist/index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "src/index.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+      "dest": "dist/index.js"
     }
   ],
   "env": {
-    "MONGODB_URI": "mongodb+srv://arslantaha67:0022800228t@panel.gjn1k.mongodb.net/panel?retryWrites=true&w=majority&appName=Panel"
+    "NODE_ENV": "production"
   }
 } 
