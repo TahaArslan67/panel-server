@@ -69,5 +69,21 @@ if (process.env.NODE_ENV !== 'production') {
   }).catch(console.error);
 }
 
-// Production için export
-module.exports = app;
+// Vercel için handler
+const handler = async (req: express.Request, res: express.Response) => {
+  try {
+    // MongoDB bağlantısı
+    await connectDB();
+    
+    // Express uygulamasını çalıştır
+    app(req, res);
+  } catch (error) {
+    console.error('Handler error:', error);
+    res.status(500).json({
+      error: 'Server error',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error as Error).message
+    });
+  }
+};
+
+export default handler;
