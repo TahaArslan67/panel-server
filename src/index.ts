@@ -11,9 +11,7 @@ const app = express();
 
 // CORS ayarları
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://panel-client-sigma.vercel.app']
-    : ['http://localhost:3000'],
+  origin: '*',  // Tüm originlere izin ver
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -29,32 +27,27 @@ if (!MONGODB_URI) {
   throw new Error('MONGODB_URI is not defined');
 }
 
-// Global connection promise
-let dbPromise: Promise<typeof mongoose> | null = null;
-
+// MongoDB bağlantı yönetimi
 const connectDB = async () => {
-  if (!dbPromise) {
-    console.log('MongoDB bağlantısı başlatılıyor...');
-    
-    // Yeni bağlantı oluştur
-    dbPromise = mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000,
-      socketTimeoutMS: 3000,
-      connectTimeoutMS: 3000,
-      maxPoolSize: 1,
-      minPoolSize: 1,
-      maxIdleTimeMS: 3000
-    }).catch(err => {
-      console.error('MongoDB bağlantı hatası:', err);
-      dbPromise = null;
-      throw err;
-    });
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
 
-  return dbPromise;
+  try {
+    const conn = await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 2000,
+      socketTimeoutMS: 2000,
+      connectTimeoutMS: 2000,
+      maxPoolSize: 1
+    });
+    return conn;
+  } catch (error) {
+    console.error('MongoDB bağlantı hatası:', error);
+    throw error;
+  }
 };
 
-// Basit endpoint'ler - MongoDB bağlantısı gerektirmez
+// Basit endpoint'ler
 app.get('/', (_req, res) => {
   res.json({ status: 'ok', message: 'Panel API is running' });
 });
@@ -85,16 +78,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Vercel için handler
 const handler = async (req: express.Request, res: express.Response) => {
   // Basit endpoint'ler için hızlı yanıt
-  if (req.url === '/') {
-    return res.json({ status: 'ok', message: 'Panel API is running' });
-  }
-  if (req.url === '/health') {
-    return res.json({
-      status: 'ok',
-      message: 'Server is running',
-      environment: process.env.NODE_ENV,
-      timestamp: new Date().toISOString()
-    });
+  if (req.url === '/' || req.url === '/health') {
+    return app(req, res);
   }
 
   try {
@@ -107,12 +92,6 @@ const handler = async (req: express.Request, res: express.Response) => {
       error: 'Database connection failed',
       message: process.env.NODE_ENV === 'production' ? undefined : (error as Error).message
     });
-  } finally {
-    // Bağlantıyı kapat
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-      dbPromise = null;
-    }
   }
 };
 
