@@ -54,7 +54,7 @@ app.get('/health', async (_req, res) => {
   try {
     await connectDB();
     const dbState = mongoose.connection.readyState;
-    const dbStatus = {
+    const dbStatus: { [key: number]: string } = {
       0: 'disconnected',
       1: 'connected',
       2: 'connecting',
